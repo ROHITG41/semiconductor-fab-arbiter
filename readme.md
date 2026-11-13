@@ -52,3 +52,25 @@ flowchart TD
     UI --> GRAPH
     CONTRACT -->|Verified Telemetry & Attribution| LLM
     LLM --> MEMO
+
+### Technology Stack
+* **Runtime & UI:** Python 3.12, Streamlit Community Cloud
+* **Orchestration & LLM:** LangChain, Google Gemini (`gemini-3.8-flash`)
+* **Deterministic Analytics:** Pandas, NumPy, Pydantic v2
+
+### Author & Architect
+**Rohit Kumar, PMP, CEng (India), CEA, FSEr (TÜV)**  
+Cross-Technology Technical Architect | Mission-Critical Infrastructure & Applied AI Solutions  
+[LinkedIn](https://www.linkedin.com/in/rohitg41) | [Live Application](https://rohit-kumar-p6-sentry.streamlit.app)
+
+---
+
+### Enterprise Advisory & Custom Architecture
+Available for technical consulting, custom agentic workflow development, and private enterprise deployments.  
+**Connect:** [LinkedIn](https://www.linkedin.com/in/rohitg41) | **Email:** `grohit41@gmail.com`
+
+---
+
+### Intellectual Property & Licensing
+**Copyright © 2026 Rohit Kumar. All Rights Reserved.**  
+This repository and its source code are published solely for technical portfolio evaluation and architectural demonstration. Unauthorized copying, redistribution, or commercial deployment is prohibited without prior written consent.
