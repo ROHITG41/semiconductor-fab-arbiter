@@ -1,38 +1,54 @@
-# 🔬 Semiconductor Change Intelligence & Hook-Up Arbiter
+# Autonomous Semiconductor Change Intelligence & Hook-Up Arbiter
 
-[![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
-[![Streamlit Cloud](https://img.shields.io/badge/Streamlit-Cloud-red.svg)](https://share.streamlit.io/)
-[![Pydantic v2](https://img.shields.io/badge/Pydantic-v2-green.svg)](https://pydantic.dev/)
-[![ReportLab](https://img.shields.io/badge/ReportLab-PDF-orange.svg)](https://www.reportlab.com/)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://semiconductor-fab-arbiter.streamlit.app)
+![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![Audit Standard](https://img.shields.io/badge/Audit%20Standard-SEMI%20%2F%20ASHRAE-059669)
+![Cognitive LLM](https://img.shields.io/badge/Cognitive%20LLM-gemini--3.8--flash-7C3AED)
+![Architecture](https://img.shields.io/badge/Architecture-Deterministic--Cognitive%20Agent-1E3A8A)
 
-Autonomous engineering and commercial arbitration agent engineered for advanced semiconductor wafer fabrication facilities ($3B–$28B CapEx). During Phase 3/4 cleanroom fit-out, tool move-in, and testing & commissioning (T&C), late OEM process tool changes frequently collide with fixed base-build sub-fab headers and overlapping contractor schedules. This application automates synchronization across **8 coupled Point-of-Use (POU) utility services** to protect first-wafer revenue and capital budgets.
+> **Dataset & Confidentiality Note:** This application is an independent engineering architecture demonstration validated on representative, anonymized project datasets.
 
 ---
 
-## 🏗️ System Architecture & Hybrid Data Flow
+### Executive Problem Statement
+On $3B–$28B semiconductor fab projects, Phase 3/4 cleanroom fit-out, tool move-in, and testing & commissioning (T&C) face an acute operational bottleneck. Continuous revisions to OEM process tool manuals collide with fixed base-build sub-fab headers and overlapping contractor schedules. Every single day of delay to 'First Wafer' output costs semiconductor owners between $1M and $5M+ in deferred revenue, while manual tracking across spreadsheets fails to catch coupled hydraulic and exhaust shortfalls.
 
-The application enforces a strict **Deterministic CPU + Cognitive Multi-Agent** separation of labor, utilizing **Model Context Protocol (MCP)** client-server patterns to ensure zero AI math hallucinations in hydraulic, exhaust, vibration, and contractual schedule calculations.
+### Operational Value
+- **Prevents Cleanroom Tear-Out & Schedule Slip:** Immediately recalculates coupled sub-fab fluid and exhaust physics when an OEM issues a late specification change—flagging lateral pipe or duct upsizing directives before cleanroom welding begins.
+- **Protects CapEx Against Inflated Claims:** Runs deterministic schedule concurrency math under SCL Delay Protocols and FIDIC Sub-Clause 8.4 rules to isolate liability across Base-Build MEP, Tool-Install Contractors, and Tool OEMs, certifying only strictly justified Extension of Time (EoT) days.
+- **Shields Wafer Yield & Life Safety:** Enforces SEMI S2, SEMI F47, ISO 14644-1, and VC-E/VC-G micro-vibration limits prior to Gas-Turn-On (GTO) clearance.
+
+---
+
+### System Architecture
 
 ```mermaid
-graph TD
-    A["Raw OEM Engineering Change Notice (ECN) & DBR Baseline"] --> B["Step 1: Pydantic v2 Spec Ingestion & Data Contracts"]
-    B --> C["Step 2: MCP Python Calculation Server (Deterministic CPU Physics)"]
-    
-    subgraph "Deterministic Sub-Fab Physics & SEMI Gates"
-        C1["Darcy-Weisbach Hydronic & PCW Delta-P"]
-        C2["SEMI S6 Scrubber Exhaust & Fan Affinity"]
-        C3["SEMI F47 Voltage-Sag & VC-E Micro-Vibration"]
-        C4["SCL Delay Protocol & Concurrency Math"]
+flowchart TD
+    classDef client fill:#EFF6FF,stroke:#2563EB,stroke-width:2px,color:#1E3A8A;
+    classDef deterministic fill:#ECFDF5,stroke:#059669,stroke-width:2px,color:#064E3B;
+    classDef logic fill:#FAF5FF,stroke:#7C3AED,stroke-width:2px,color:#4C1D95;
+    classDef output fill:#F8FAFC,stroke:#475569,stroke-width:2px,color:#0F172A;
+
+    subgraph INGRESS ["1. SPECIFICATION & ECN INGRESS"]
+        UI["Streamlit Cloud Command Center<br/><b>Tool Bay Telemetry, Baseline DBR & Raw OEM ECN Text</b>"]:::client
     end
-    
-    C --> C1 & C2 & C3 & C4
-    C1 & C2 & C3 & C4 --> D["Step 3: Multi-Agent Scope & Readiness Arbitration"]
-    
-    subgraph "Cognitive Multi-Agent Consensus"
-        D1["Process Yield & OEM Compliance Sentinel"]
-        D2["Base-Build & CapEx Commercial Auditor"]
-        D3["Fab T&C & Commercial Arbiter"]
+
+    subgraph CPU_GATE ["2. DETERMINISTIC MCP CALCULATION SERVER"]
+        direction TB
+        GRAPH["<b>Multiphysics Computation (CPU)</b><br/>Audits Darcy-Weisbach PCW Friction, SEMI S6 Exhaust & VC-E Vibration"]:::deterministic
+        METRICS["<b>Hook-Up Readiness Index (HRI 0-100)</b><br/>Computes Coupled Header Headroom & Safety Gates"]:::deterministic
+        CONTRACT["<b>Pydantic v2 Structured Payload</b><br/>Immutable Point-of-Use (POU) Data Contracts"]:::deterministic
+        GRAPH --> METRICS --> CONTRACT
     end
-    
-    D --> D1 & D2 & D3
-    D1 & D2 & D3 --> E["Binding Gas-Turn-On (GTO) Verdict & ReportLab PDF Dossier"]
+
+    subgraph COGNITIVE ["3. COGNITIVE MULTI-AGENT ARBITRATION"]
+        LLM["<b>LangChain + Google Gemini (gemini-3.8-flash)</b><br/>Multi-Agent Debate: Yield Sentinel, CapEx Auditor & T&C Arbiter<br/>Enforces FIDIC Contract Governance & SCL Protocols"]:::logic
+    end
+
+    subgraph DELIVERABLE ["4. AUDIT-GRADE DOSSIER OUTPUT"]
+        MEMO["<b>Pre-Hookup Readiness & NCR PDF Dossier</b><br/>Signed Engineering Determination & Trade Remediation Directives"]:::output
+    end
+
+    UI --> GRAPH
+    CONTRACT -->|Verified Telemetry & Attribution| LLM
+    LLM --> MEMO
