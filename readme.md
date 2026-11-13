@@ -52,3 +52,29 @@ flowchart TD
     UI --> GRAPH
     CONTRACT -->|Verified Telemetry & Attribution| LLM
     LLM --> MEMO
+
+### Part 3: Tech Stack, Author, Advisory & Licensing
+```markdown
+---
+
+### Technology Stack
+- **Runtime & UI:** Python 3.12, Streamlit Community Cloud
+- **Orchestration & LLM:** LangChain, Google Gemini (`gemini-3.8-flash`)
+- **Deterministic Analytics:** Pandas, Pydantic v2, ReportLab PDF Engine
+
+### Author & Architect
+**Rohit Kumar, PMP, CEng (India), CEA, FSEr (TÜV)**  
+Mission-Critical Infrastructure & Systems Engineering Specialist | Forensic Project Controls & Contract Governance  
+[LinkedIn](https://www.linkedin.com/in/rohitg41) | [Live Application](https://semiconductor-fab-arbiter.streamlit.app)
+
+---
+
+### Enterprise Advisory & Custom Architecture
+Available for technical consulting, custom agentic workflow development, and private enterprise deployments.  
+**Connect:** [LinkedIn](https://www.linkedin.com/in/rohitg41) | **Email:** `grohit41@gmail.com`
+
+---
+
+### Intellectual Property & Licensing
+**Copyright © 2026 Rohit Kumar. All Rights Reserved.**  
+This repository and its source code are published solely for technical portfolio evaluation and architectural demonstration. Unauthorized copying, redistribution, or commercial deployment is prohibited without prior written consent.
