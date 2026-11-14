@@ -204,14 +204,12 @@ def run_fab_tool_audit(
     }
 
 # ---------------------------------------------------------------------
-# 4. REPORTLAB PDF DOSSIER GENERATOR (CALIBRATED 1-PAGE FIT & SANITIZED)
+# 4. REPORTLAB PDF DOSSIER GENERATOR (NO ORPHANS & NO BLANK PAGES)
 # ---------------------------------------------------------------------
 def _sanitize_markdown_for_reportlab(text: str) -> str:
-    """Strips LaTeX ($...$), replaces Unicode dashes, and converts **bold** to <b>bold</b>."""
+    """Strips LaTeX math ($...$), backticks, and converts **bold** to ReportLab XML <b>bold</b>."""
     text = re.sub(r'\$([^\$]+)\$', r'\1', text)
     text = text.replace('`', '')
-    # Replace em-dash and en-dash with clean ASCII equivalents so Helvetica never drops them
-    text = text.replace('—', ' - ').replace('–', '-')
     text = re.sub(r'&(?!amp;|lt;|gt;|bull;|copy;|nbsp;)', '&amp;', text)
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
     text = text.replace('*', '')
@@ -224,8 +222,8 @@ def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
         pagesize=letter,
         rightMargin=36,
         leftMargin=36,
-        topMargin=22,
-        bottomMargin=22
+        topMargin=28,
+        bottomMargin=28
     )
     styles = getSampleStyleSheet()
     
@@ -235,71 +233,71 @@ def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
     c_light = colors.HexColor("#F8FAFC")
     c_border = colors.HexColor("#CBD5E1")
 
-    # Calibrated Executive Paragraph Styles (Fits cleanly on 1 page without orphans)
+    # Custom Executive Paragraph Styles (keepWithNext=True prevents orphaned titles!)
     style_kicker = ParagraphStyle(
         'Kicker', parent=styles['Normal'],
-        fontName='Helvetica-Bold', fontSize=8.0, leading=10,
-        textColor=c_teal, spaceAfter=1, keepWithNext=True
+        fontName='Helvetica-Bold', fontSize=8.5, leading=11,
+        textColor=c_teal, spaceAfter=2, keepWithNext=True
     )
     style_title = ParagraphStyle(
         'ExecTitle', parent=styles['Title'],
-        fontName='Helvetica-Bold', fontSize=13.5, leading=16.5,
-        textColor=c_navy, alignment=0, spaceAfter=2, keepWithNext=True
+        fontName='Helvetica-Bold', fontSize=14.5, leading=18,
+        textColor=c_navy, alignment=0, spaceAfter=3, keepWithNext=True
     )
     style_sub = ParagraphStyle(
         'ExecSub', parent=styles['Normal'],
-        fontName='Helvetica-Bold', fontSize=9.0, leading=11.5,
-        textColor=c_slate, spaceAfter=3, keepWithNext=True
+        fontName='Helvetica-Bold', fontSize=9.5, leading=12.5,
+        textColor=c_slate, spaceAfter=4, keepWithNext=True
     )
     style_prov = ParagraphStyle(
         'Provenance', parent=styles['Normal'],
-        fontName='Helvetica', fontSize=7.6, leading=10.2,
+        fontName='Helvetica', fontSize=8.0, leading=11.0,
         textColor=c_slate
     )
     style_h2 = ParagraphStyle(
         'SectionH2', parent=styles['Heading2'],
-        fontName='Helvetica-Bold', fontSize=10.0, leading=12.5,
-        textColor=c_navy, spaceBefore=6, spaceAfter=2, keepWithNext=True
+        fontName='Helvetica-Bold', fontSize=10.5, leading=13.5,
+        textColor=c_navy, spaceBefore=8, spaceAfter=3, keepWithNext=True
     )
     style_h3 = ParagraphStyle(
         'SectionH3', parent=styles['Heading3'],
-        fontName='Helvetica-Bold', fontSize=8.8, leading=11.2,
-        textColor=c_teal, spaceBefore=4.5, spaceAfter=1.5, keepWithNext=True
+        fontName='Helvetica-Bold', fontSize=9.5, leading=12.5,
+        textColor=c_teal, spaceBefore=6, spaceAfter=2, keepWithNext=True
     )
     style_body = ParagraphStyle(
         'ExecBody', parent=styles['Normal'],
-        fontName='Helvetica', fontSize=8.3, leading=11.0,
-        textColor=c_slate, spaceAfter=1.8
+        fontName='Helvetica', fontSize=8.8, leading=12.2,
+        textColor=c_slate, spaceAfter=2.5
     )
     style_bullet = ParagraphStyle(
         'ExecBullet', parent=styles['Normal'],
-        fontName='Helvetica', fontSize=8.3, leading=11.0,
-        textColor=c_slate, leftIndent=10, spaceAfter=1.8
+        fontName='Helvetica', fontSize=8.8, leading=12.2,
+        textColor=c_slate, leftIndent=12, spaceAfter=2.5
     )
     style_th = ParagraphStyle(
         'TableHead', parent=styles['Normal'],
-        fontName='Helvetica-Bold', fontSize=8.0, leading=10.0,
+        fontName='Helvetica-Bold', fontSize=8.2, leading=10.5,
         textColor=colors.white
     )
     style_td = ParagraphStyle(
         'TableCell', parent=styles['Normal'],
-        fontName='Helvetica', fontSize=7.9, leading=10.0,
+        fontName='Helvetica', fontSize=8.0, leading=10.5,
         textColor=c_slate
     )
     style_td_bold = ParagraphStyle(
         'TableCellBold', parent=styles['Normal'],
-        fontName='Helvetica-Bold', fontSize=7.9, leading=10.0,
+        fontName='Helvetica-Bold', fontSize=8.0, leading=10.5,
         textColor=c_navy
     )
     style_footer = ParagraphStyle(
         'ExecFooter', parent=styles['Normal'],
-        fontName='Helvetica-Oblique', fontSize=7.2, leading=9.5,
+        fontName='Helvetica-Oblique', fontSize=7.5, leading=10,
         textColor=colors.HexColor("#64748B"), alignment=1
     )
 
     story: List[Any] = []
 
-    # 1. Masthead & Provenance Card (Single-line Architecture Standard without 'ReportLab)' wrap)
+    # 1. Masthead & Provenance Card grouped in KeepTogether so header never splits
     prov_html = (
         "<b>Lead Systems Architect:</b> Rohit Kumar, PMP, CEng (India), CEA, FSEr (TÜV)<br/>"
         "<b>Professional Domain:</b> Mission-Critical Infrastructure &amp; Systems Engineering Specialist | "
@@ -307,17 +305,17 @@ def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
         "<b>Contact &amp; Channels:</b> grohit41@gmail.com | LinkedIn: linkedin.com/in/rohitg41 | "
         "GitHub: github.com/ROHITG41/semiconductor-fab-arbiter<br/>"
         "<b>Architecture Standard:</b> Hybrid Deterministic CPU Multiphysics + Cognitive Multi-Agent Consensus "
-        "(Python 3.12 / Pydantic v2 / Gemini / ReportLab)"
+        "(Python 3.12 / Pydantic v2 / Google Gemini / ReportLab)"
     )
     prov_table = Table([[Paragraph(prov_html, style_prov)]], colWidths=[540])
     prov_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), c_light),
         ('BOX', (0, 0), (-1, -1), 0.75, c_border),
         ('LINEBEFORE', (0, 0), (0, -1), 3.5, c_navy),
-        ('TOPPADDING', (0, 0), (-1, -1), 4.5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4.5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
     ]))
 
     story.append(KeepTogether([
@@ -328,12 +326,12 @@ def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
             f"Hook-Up Readiness Index (HRI): {audit_res['hri_score']:.0f}/100 ({audit_res['hri_status']})",
             style_sub
         ),
-        HRFlowable(width="100%", thickness=1.8, color=c_teal, spaceBefore=1, spaceAfter=4),
+        HRFlowable(width="100%", thickness=2, color=c_teal, spaceBefore=2, spaceAfter=6),
         prov_table,
-        Spacer(1, 5)
+        Spacer(1, 8)
     ]))
 
-    # 2. Deterministic Telemetry & Attribution Table (Rebalanced widths & clean ASCII separators)
+    # 2. Deterministic Telemetry & Attribution Table (Kept together with its title)
     table_data = [
         [
             Paragraph("Audit Parameter", style_th),
@@ -376,8 +374,8 @@ def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
             Paragraph("SCL / FIDIC Cl. 8.4", style_td),
             Paragraph(f"Concurrent: {audit_res['concurrent_delay']} days", style_td),
             Paragraph(
-                f"Net Culpable Lag: Tool-Install = <b>{audit_res['net_tool_install_lag']}d</b> | "
-                f"Base-Build MEP = <b>{audit_res['net_base_build_lag']}d</b>",
+                f"Net Culpable Lag — Tool-Install: <b>{audit_res['net_tool_install_lag']}d</b> | "
+                f"Base-Build MEP: <b>{audit_res['net_base_build_lag']}d</b>",
                 style_td
             )
         ],
@@ -388,15 +386,15 @@ def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
             Paragraph(f"<b>{audit_res['primary_culprit']}</b>", style_td)
         ],
     ]
-    t = Table(table_data, colWidths=[135, 100, 100, 205], repeatRows=1)
+    t = Table(table_data, colWidths=[125, 95, 105, 215], repeatRows=1)
     t.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), c_navy),
         ('BACKGROUND', (0, 1), (-1, -1), colors.white),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, c_light]),
         ('GRID', (0, 0), (-1, -1), 0.5, c_border),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 3.5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3.5),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4.5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4.5),
         ('LEFTPADDING', (0, 0), (-1, -1), 6),
         ('RIGHTPADDING', (0, 0), (-1, -1), 6),
     ]))
@@ -404,13 +402,13 @@ def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
     story.append(KeepTogether([
         Paragraph("Deterministic Sub-Fab Utility &amp; Concurrency Audit Summary", style_h2),
         t,
-        Spacer(1, 5)
+        Spacer(1, 8)
     ]))
 
     # 3. Multi-Agent Arbitration Memorandum (Orphan-Protected Subsections)
     memo_header_flowables: List[Any] = [
         Paragraph("Executive Multi-Agent Arbitration &amp; Engineering Adjudication Memorandum", style_h2),
-        HRFlowable(width="100%", thickness=1, color=c_navy, spaceBefore=1, spaceAfter=3)
+        HRFlowable(width="100%", thickness=1, color=c_navy, spaceBefore=2, spaceAfter=4)
     ]
 
     pending_flowables: List[Any] = memo_header_flowables
@@ -444,13 +442,13 @@ def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
     if pending_flowables:
         story.append(KeepTogether(pending_flowables))
 
-    # 4. Anti-Blank-Page Guard: Strip trailing Spacers and append compact footer
+    # 4. Anti-Blank-Page Guard: Strip any trailing Spacers before appending the compact footer
     while story and isinstance(story[-1], Spacer):
         story.pop()
 
     footer_block = KeepTogether([
-        Spacer(1, 5),
-        HRFlowable(width="100%", thickness=0.75, color=c_border, spaceBefore=1, spaceAfter=2),
+        Spacer(1, 6),
+        HRFlowable(width="100%", thickness=0.75, color=c_border, spaceBefore=2, spaceAfter=3),
         Paragraph(
             "Copyright &copy; 2026 Rohit Kumar, PMP, CEng (India), CEA, FSEr (TÜV). All Rights Reserved. "
             "Generated via Autonomous Semiconductor Change Intelligence &amp; Hook-Up Arbiter.",
@@ -482,12 +480,12 @@ def load_fab_wide_register():
 def build_deterministic_arbiter_memo(res: Dict[str, Any]) -> str:
     return f"""### 1. Executive Summary & Tool Hook-Up Disposition
 - **Tool ID & Bay:** {res['tool_id']} ({res['process_bay']})
-- **Hook-Up Readiness Index (HRI):** {res['hri_score']:.0f}/100 | Status: **{res['hri_status']}**
+- **Hook-Up Readiness Index (HRI):** {res['hri_score']:.0f}/100 — **{res['hri_status']}**
 - **Primary Liability Assignment:** {res['primary_culprit']}
 
 ### 2. Coupled Sub-Fab Physics & Spec-Delta Audit
-- **Scrubber Exhaust Impact:** Baseline {res.get('baseline_cfm', 1400):,.0f} CFM vs. Revised {res.get('revised_cfm', 1720):,.0f} CFM ({res['cfm_delta']:+,.0f} CFM delta) | Header Exhaust Violation: **{str(res['exhaust_headroom_violation']).upper()}**.
-- **Process Cooling Water Impact:** Baseline {res.get('baseline_gpm', 45):,.1f} GPM vs. Revised {res.get('revised_gpm', 56):,.1f} GPM ({res['gpm_delta']:+,.1f} GPM delta) | PCW Headroom Violation: **{str(res['pcw_headroom_violation']).upper()}**.
+- **Scrubber Exhaust Impact:** Baseline {res.get('baseline_cfm', 1400):,.0f} CFM vs. Revised {res.get('revised_cfm', 1720):,.0f} CFM ({res['cfm_delta']:+,.0f} CFM delta). Header Exhaust Headroom Violation: **{str(res['exhaust_headroom_violation']).upper()}**.
+- **Process Cooling Water Impact:** Baseline {res.get('baseline_gpm', 45):,.1f} GPM vs. Revised {res.get('revised_gpm', 56):,.1f} GPM ({res['gpm_delta']:+,.1f} GPM delta). PCW Headroom Violation: **{str(res['pcw_headroom_violation']).upper()}**.
 - **Micro-Vibration & Power Safety:** SEMI F47 Voltage-Sag Compliance: **VERIFIED** | VC-E Vibration Limit: **{'BREACHED' if res['vibration_violation'] else 'COMPLIANT'}**.
 
 ### 3. Forensic Schedule Concurrency & EoT Determination
@@ -689,7 +687,7 @@ def main():
                          "You are the Lead Semiconductor Capital Program & Commissioning Arbiter. "
                          "Analyze the provided deterministic telemetry, sub-fab header headroom, micro-vibration checks, "
                          "and schedule concurrency attribution for process tool hook-up. "
-                         "STRICT FORMATTING RULE: Never use LaTeX math ($...$), em-dashes, or backticks. Write all numbers and equations in plain ASCII text. "
+                         "STRICT FORMATTING RULE: Never use LaTeX math ($...$) or backticks. Write all numbers and equations in plain alphanumeric text. "
                          "Draft an authoritative Multi-Agent Arbitration Memorandum covering: "
                          "1. Executive Summary & Tool Hook-Up Disposition, 2. Coupled Sub-Fab Physics & Spec-Delta Audit, "
                          "3. Forensic Schedule Concurrency & EoT Determination, "
