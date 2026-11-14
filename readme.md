@@ -1,17 +1,17 @@
 # Autonomous Semiconductor Change Intelligence & Hook-Up Arbiter
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://semiconductor-fab-arbiter.streamlit.app)
-![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
-![Audit Standard](https://img.shields.io/badge/Audit%20Standard-SEMI%20%2F%20ASHRAE-059669)
-![Cognitive LLM](https://img.shields.io/badge/Cognitive%20LLM-gemini--3.8--flash-7C3AED)
-![Architecture](https://img.shields.io/badge/Architecture-Deterministic--Cognitive%20Agent-1E3A8A)
+[![Open in Streamlit](https://streamlit.io)](https://streamlit.app)
+![Python 3.12](https://shields.io)
+![Audit Standard](https://shields.io)
+![Cognitive LLM](https://shields.io)
+![Architecture](https://shields.io)
 
 > **Dataset & Confidentiality Note:** This application is an independent engineering architecture demonstration validated on representative, anonymized project datasets.
 
 ---
 
 ### Executive Problem Statement
-On $3B–$28B semiconductor fab projects, Phase 3/4 cleanroom fit-out, tool move-in, and testing & commissioning (T&C) face an acute operational bottleneck. Continuous revisions to OEM process tool manuals collide with fixed base-build sub-fab headers and overlapping contractor schedules. Every single day of delay to 'First Wafer' output costs semiconductor owners between $1M and $5M+ in deferred revenue, while manual tracking across spreadsheets fails to catch coupled hydraulic and exhaust shortfalls.
+On &#36;3B–&#36;28B semiconductor fab projects, Phase 3/4 cleanroom fit-out, tool move-in, and testing & commissioning (T&C) face an acute operational bottleneck. Continuous revisions to OEM process tool manuals collide with fixed base-build sub-fab headers and overlapping contractor schedules. Every single day of delay to 'First Wafer' output costs semiconductor owners between &#36;1M and &#36;5M+ in deferred revenue, while manual tracking across spreadsheets fails to catch coupled hydraulic and exhaust shortfalls.
 
 ### Operational Value
 - **Prevents Cleanroom Tear-Out & Schedule Slip:** Immediately recalculates coupled sub-fab fluid and exhaust physics when an OEM issues a late specification change—flagging lateral pipe or duct upsizing directives before cleanroom welding begins.
@@ -34,7 +34,6 @@ flowchart TD
     end
 
     subgraph CPU_GATE ["2. DETERMINISTIC MCP CALCULATION SERVER"]
-        direction TB
         GRAPH["<b>Multiphysics Computation (CPU)</b><br/>Audits Darcy-Weisbach PCW Friction, SEMI S6 Exhaust & VC-E Vibration"]:::deterministic
         METRICS["<b>Hook-Up Readiness Index (HRI 0-100)</b><br/>Computes Coupled Header Headroom & Safety Gates"]:::deterministic
         CONTRACT["<b>Pydantic v2 Structured Payload</b><br/>Immutable Point-of-Use (POU) Data Contracts"]:::deterministic
@@ -52,3 +51,34 @@ flowchart TD
     UI --> GRAPH
     CONTRACT -->|Verified Telemetry & Attribution| LLM
     LLM --> MEMO
+```
+
+---
+
+### Technology Stack
+- **Runtime & UI:** Python 3.12, Streamlit Community Cloud
+- **Orchestration & LLM:** LangChain, Google Gemini (`gemini-3.8-flash`)
+- **Deterministic Analytics:** Pandas, Pydantic v2, ReportLab PDF Engine
+
+---
+
+### Author & Architect
+**Rohit Kumar, PMP, CEng (India), CEA, FSEr (TÜV)**  
+*Mission-Critical Infrastructure & Systems Engineering Specialist | Forensic Project Controls & Contract Governance*  
+
+[LinkedIn](https://www.linkedin.com/in/rohitg41/) | [Live Application](https://streamlit.app)
+
+---
+
+### Enterprise Advisory & Custom Architecture
+Available for technical consulting, custom agentic workflow development, and private enterprise deployments.
+
+- **Connect:** [LinkedIn](https://www.linkedin.com/in/rohitg41/)
+- **Email:** grohit41@gmail.com
+
+---
+
+### Intellectual Property & Licensing
+Copyright © 2026 Rohit Kumar. All Rights Reserved.
+
+This repository and its source code are published solely for technical portfolio evaluation and architectural demonstration. Unauthorized copying, redistribution, or commercial deployment is prohibited without prior written consent.
