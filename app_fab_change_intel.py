@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 
-# ReportLab PDF Imports (Added KeepTogether to prevent orphaned headings & blank pages)
+# ReportLab PDF Imports
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, KeepTogether
@@ -406,47 +406,46 @@ def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
     ]))
 
     # 3. Multi-Agent Arbitration Memorandum (Orphan-Protected Subsections)
-    story.append(Paragraph("Executive Multi-Agent Arbitration &amp; Engineering Adjudication Memorandum", style_h2))
-    story.append(HRFlowable(width="100%", thickness=1, color=c_navy, spaceBefore=2, spaceAfter=4, keepWithNext=True))
+    memo_header_flowables: List[Any] = [
+        Paragraph("Executive Multi-Agent Arbitration &amp; Engineering Adjudication Memorandum", style_h2),
+        HRFlowable(width="100%", thickness=1, color=c_navy, spaceBefore=2, spaceAfter=4)
+    ]
 
-    pending_heading = None
+    pending_flowables: List[Any] = memo_header_flowables
     for raw_line in memo_text.split('\n'):
         line = raw_line.strip()
         if not line or line == '---':
             continue
         if line.startswith('### ') or line.startswith('## ') or line.startswith('# '):
-            if pending_heading is not None:
-                story.append(pending_heading)
             clean_heading = re.sub(r'^#+\s*', '', line)
             clean_heading = _sanitize_markdown_for_reportlab(clean_heading)
-            pending_heading = Paragraph(clean_heading, style_h3)
+            pending_flowables.append(Paragraph(clean_heading, style_h3))
         elif line.startswith('- ') or line.startswith('* '):
             clean_bullet = _sanitize_markdown_for_reportlab(line[2:])
             p_item = Paragraph(f"&bull; {clean_bullet}", style_bullet)
-            if pending_heading is not None:
-                # Bind heading with its first bullet point so title is never left orphaned!
-                story.append(KeepTogether([pending_heading, p_item]))
-                pending_heading = None
+            if pending_flowables:
+                pending_flowables.append(p_item)
+                story.append(KeepTogether(pending_flowables))
+                pending_flowables = []
             else:
                 story.append(p_item)
         else:
             clean_body = _sanitize_markdown_for_reportlab(line)
             p_item = Paragraph(clean_body, style_body)
-            if pending_heading is not None:
-                # Bind heading with its first body paragraph so title is never left orphaned!
-                story.append(KeepTogether([pending_heading, p_item]))
-                pending_heading = None
+            if pending_flowables:
+                pending_flowables.append(p_item)
+                story.append(KeepTogether(pending_flowables))
+                pending_flowables = []
             else:
                 story.append(p_item)
 
-    if pending_heading is not None:
-        story.append(pending_heading)
+    if pending_flowables:
+        story.append(KeepTogether(pending_flowables))
 
     # 4. Anti-Blank-Page Guard: Strip any trailing Spacers before appending the compact footer
     while story and isinstance(story[-1], Spacer):
         story.pop()
 
-    # Keep the final item and footer tightly bound so the footer never spills onto a blank page
     footer_block = KeepTogether([
         Spacer(1, 6),
         HRFlowable(width="100%", thickness=0.75, color=c_border, spaceBefore=2, spaceAfter=3),
