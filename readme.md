@@ -1,3 +1,28 @@
+# Autonomous Semiconductor Change Intelligence & Hook-Up Arbiter
+
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://semiconductor-fab-arbiter.streamlit.app)
+![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![Audit Standard](https://img.shields.io/badge/Audit%20Standard-SEMI%20%2F%20ASHRAE-059669)
+![Cognitive LLM](https://img.shields.io/badge/Cognitive%20LLM-gemini--3.8--flash-7C3AED)
+![Architecture](https://img.shields.io/badge/Architecture-Deterministic--Cognitive%20Agent-1E3A8A)
+
+> **Dataset & Confidentiality Note:** This application is an independent engineering architecture demonstration validated on representative, anonymized project datasets.
+
+---
+
+### Executive Problem Statement
+On $3B–$28B semiconductor fab projects, Phase 3/4 cleanroom fit-out, tool move-in, and testing & commissioning (T&C) face an acute operational bottleneck. Continuous revisions to OEM process tool manuals collide with fixed base-build sub-fab headers and overlapping contractor schedules. Every single day of delay to 'First Wafer' output costs semiconductor owners between $1M and $5M+ in deferred revenue, while manual tracking across spreadsheets fails to catch coupled hydraulic and exhaust shortfalls.
+
+### Operational Value
+- **Prevents Cleanroom Tear-Out & Schedule Slip:** Immediately recalculates coupled sub-fab fluid and exhaust physics when an OEM issues a late specification change—flagging lateral pipe or duct upsizing directives before cleanroom welding begins.
+- **Protects CapEx Against Inflated Claims:** Runs deterministic schedule concurrency math under SCL Delay Protocols and FIDIC Sub-Clause 8.4 rules to isolate liability across Base-Build MEP, Tool-Install Contractors, and Tool OEMs, certifying only strictly justified Extension of Time (EoT) days.
+- **Shields Wafer Yield & Life Safety:** Enforces SEMI S2, SEMI F47, ISO 14644-1, and VC-E/VC-G micro-vibration limits prior to Gas-Turn-On (GTO) clearance.
+
+---
+
+### System Architecture
+
+```mermaid
 flowchart TD
     classDef client fill:#EFF6FF,stroke:#2563EB,stroke-width:2px,color:#1E3A8A;
     classDef deterministic fill:#ECFDF5,stroke:#059669,stroke-width:2px,color:#064E3B;
