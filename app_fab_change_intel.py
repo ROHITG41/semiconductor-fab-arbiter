@@ -1,15 +1,29 @@
 # =====================================================================
 # APPLICATION: app_fab_change_intel.py
 # PURPOSE: Semiconductor Change Intelligence & Hook-Up Arbiter
-# RUNTIME: Python 3.12 / Streamlit / Pydantic v2 / Google Gemini / ReportLab
-# ARCHITECT: Rohit Kumar, PMP, CEng (India), CEA, FSEr (TÜV)
+# 
+# TECHNOLOGY STACK:
+#   - Runtime & UI: Python 3.12, Streamlit Community Cloud
+#   - Orchestration & LLM: LangChain, Google Gemini (gemini-3.8-flash)
+#   - Deterministic Analytics: Pandas, Pydantic v2, ReportLab PDF Engine
+# 
+# AUTHOR & ARCHITECT:
+#   - Rohit Kumar, PMP, CEng (India), CEA, FSEr (TÜV)
+#   - Mission-Critical Infrastructure & Systems Engineering Specialist 
+#   - Forensic Project Controls & Contract Governance
+#   - Contact: grohit41@gmail.com | LinkedIn: ROHITG41 (linkedin.com/in/rohitg41)
+#   - Repository: https://github.com/ROHITG41/semiconductor-fab-arbiter
+#
+# INTELLECTUAL PROPERTY & LICENSING:
+#   - Copyright © 2026 Rohit Kumar. All Rights Reserved.
 # =====================================================================
 
 import os
 import io
+import re
 import streamlit as st
 import pandas as pd
-from typing import Dict, Any, List
+from typing import Dict, Any
 from pydantic import BaseModel, Field
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -126,32 +140,22 @@ def run_fab_tool_audit(
     vibration_limit_ums: float,
     semi_f47_compliant: bool
 ) -> Dict[str, Any]:
-    """
-    Runs deterministic POU fluid, exhaust, vibration, and schedule concurrency physics.
-    Zero-hallucination CPU layer for semiconductor fab arbitration.
-    """
-    # 1. Spec-Delta Calculations
     gpm_delta = revised_gpm - baseline_gpm
     cfm_delta = revised_cfm - baseline_cfm
     kw_delta = revised_kw - baseline_kw
 
-    # 2. Header Capacity & Erosion Checks
     exhaust_headroom_violation = revised_cfm > (baseline_cfm + header_exhaust_headroom_cfm)
     pcw_headroom_violation = revised_gpm > (baseline_gpm + header_pcw_headroom_gpm)
-    pipe_velocity_fps = (0.4085 * revised_gpm) / ((16.0 * 0.95) ** 2) * 16.0 # Estimated 16-inch header proxy
+    pipe_velocity_fps = (0.4085 * revised_gpm) / ((16.0 * 0.95) ** 2) * 16.0
     velocity_violation = pipe_velocity_fps > 10.0
 
-    # 3. Vibration & Power Safety Gates
     vibration_violation = vibration_actual_ums > vibration_limit_ums
     safety_gate_passed = semi_f47_compliant and not vibration_violation
 
-    # 4. Forensic Schedule & Lag Attribution Math (SCL Protocol Concurrency)
-    # Isolate concurrent delay vs net critical lag
     concurrent_delay = min(base_build_slip_days, tool_install_slip_days)
     net_tool_install_lag = max(0, tool_install_slip_days - base_build_slip_days)
     net_base_build_lag = max(0, base_build_slip_days - tool_install_slip_days)
 
-    # Primary Responsible Party Isolation
     if spec_slip_days > 0 and (exhaust_headroom_violation or pcw_headroom_violation):
         primary_culprit = "Tool OEM (Late ECN Spec Churn & Utility Escalation)"
     elif base_build_slip_days > tool_install_slip_days:
@@ -161,7 +165,6 @@ def run_fab_tool_audit(
     else:
         primary_culprit = "Shared Concurrent Delay (Base-Build & Tool-Install Co-Caused)"
 
-    # 5. Hook-Up Readiness Index (HRI 0-100)
     penalties = 0.0
     if exhaust_headroom_violation: penalties += 30.0
     if pcw_headroom_violation: penalties += 25.0
@@ -170,12 +173,17 @@ def run_fab_tool_audit(
     if spec_slip_days > 0: penalties += 10.0
     
     hri_score = max(0.0, 100.0 - penalties)
-
     hri_status = "CLEARED FOR GTO" if hri_score >= 85.0 else ("CONDITIONAL HOLD" if hri_score >= 60.0 else "CRITICAL STOP-WORK")
 
     return {
         "tool_id": tool_id,
         "process_bay": process_bay,
+        "baseline_cfm": baseline_cfm,
+        "revised_cfm": revised_cfm,
+        "baseline_gpm": baseline_gpm,
+        "revised_gpm": revised_gpm,
+        "baseline_kw": baseline_kw,
+        "revised_kw": revised_kw,
         "gpm_delta": gpm_delta,
         "cfm_delta": cfm_delta,
         "kw_delta": kw_delta,
@@ -194,61 +202,234 @@ def run_fab_tool_audit(
     }
 
 # ---------------------------------------------------------------------
-# 4. REPORTLAB PDF DOSSIER GENERATOR
+# 4. REPORTLAB PDF DOSSIER GENERATOR (FIXED & SANITIZED)
 # ---------------------------------------------------------------------
+def _sanitize_markdown_for_reportlab(text: str) -> str:
+    """Strips LaTeX math ($...$), backticks, and converts **bold** to ReportLab XML <b>bold</b>."""
+    # Remove LaTeX math dollar signs e.g. $Lag=4$ -> Lag=4
+    text = re.sub(r'\$([^\$]+)\$', r'\1', text)
+    # Remove inline code backticks
+    text = text.replace('`', '')
+    # Escape ampersands not part of XML entities
+    text = re.sub(r'&(?!amp;|lt;|gt;|bull;|copy;|nbsp;)', '&amp;', text)
+    # Convert **bold** to <b>bold</b>
+    text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
+    # Remove any stray single asterisks
+    text = text.replace('*', '')
+    return text.strip()
+
 def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
     buffer = io.BytesIO()
-    doc_pdf = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    doc_pdf = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=32,
+        bottomMargin=32
+    )
     styles = getSampleStyleSheet()
     
     c_navy = colors.HexColor("#102C57")
     c_teal = colors.HexColor("#0F766E")
     c_slate = colors.HexColor("#334155")
     c_light = colors.HexColor("#F8FAFC")
+    c_border = colors.HexColor("#CBD5E1")
+
+    # Custom Executive Paragraph Styles
+    style_kicker = ParagraphStyle(
+        'Kicker', parent=styles['Normal'],
+        fontName='Helvetica-Bold', fontSize=8.5, leading=11,
+        textColor=c_teal, spaceAfter=2
+    )
+    style_title = ParagraphStyle(
+        'ExecTitle', parent=styles['Title'],
+        fontName='Helvetica-Bold', fontSize=15, leading=19,
+        textColor=c_navy, alignment=0, spaceAfter=4
+    )
+    style_sub = ParagraphStyle(
+        'ExecSub', parent=styles['Normal'],
+        fontName='Helvetica-Bold', fontSize=10, leading=13,
+        textColor=c_slate, spaceAfter=6
+    )
+    style_prov = ParagraphStyle(
+        'Provenance', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=8.2, leading=11.5,
+        textColor=c_slate
+    )
+    style_h2 = ParagraphStyle(
+        'SectionH2', parent=styles['Heading2'],
+        fontName='Helvetica-Bold', fontSize=11, leading=14,
+        textColor=c_navy, spaceBefore=10, spaceAfter=4
+    )
+    style_h3 = ParagraphStyle(
+        'SectionH3', parent=styles['Heading3'],
+        fontName='Helvetica-Bold', fontSize=9.8, leading=13,
+        textColor=c_teal, spaceBefore=8, spaceAfter=3
+    )
+    style_body = ParagraphStyle(
+        'ExecBody', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=9, leading=13,
+        textColor=c_slate, spaceAfter=3
+    )
+    style_bullet = ParagraphStyle(
+        'ExecBullet', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=9, leading=13,
+        textColor=c_slate, leftIndent=12, spaceAfter=3
+    )
+    style_th = ParagraphStyle(
+        'TableHead', parent=styles['Normal'],
+        fontName='Helvetica-Bold', fontSize=8.5, leading=11,
+        textColor=colors.white
+    )
+    style_td = ParagraphStyle(
+        'TableCell', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=8.3, leading=11,
+        textColor=c_slate
+    )
+    style_td_bold = ParagraphStyle(
+        'TableCellBold', parent=styles['Normal'],
+        fontName='Helvetica-Bold', fontSize=8.3, leading=11,
+        textColor=c_navy
+    )
+    style_footer = ParagraphStyle(
+        'ExecFooter', parent=styles['Normal'],
+        fontName='Helvetica-Oblique', fontSize=7.5, leading=10,
+        textColor=colors.HexColor("#64748B"), alignment=1
+    )
 
     story = []
 
-    # Title Banner
-    story.append(Paragraph("SEMICONDUCTOR CHANGE INTELLIGENCE & HOOK-UP ARBITER", styles['Normal']))
-    story.append(Spacer(1, 4))
-    story.append(Paragraph(f"Pre-Hookup Readiness & Forensic Adjudication Dossier: {audit_res['tool_id']}", styles['Title']))
-    story.append(Paragraph(f"Process Zone: {audit_res['process_bay']} | Hook-Up Readiness Index (HRI): {audit_res['hri_score']:.0f}/100 ({audit_res['hri_status']})", styles['Heading2']))
-    story.append(HRFlowable(width="100%", thickness=2, color=c_teal, spaceBefore=6, spaceAfter=12))
+    # 1. Masthead
+    story.append(Paragraph("AUTONOMOUS SEMICONDUCTOR CHANGE INTELLIGENCE &amp; HOOK-UP ARBITER", style_kicker))
+    story.append(Paragraph(f"Pre-Hookup Readiness &amp; Forensic Adjudication Dossier: {audit_res['tool_id']}", style_title))
+    story.append(Paragraph(
+        f"Process Zone: {audit_res['process_bay']} &nbsp;|&nbsp; "
+        f"Hook-Up Readiness Index (HRI): {audit_res['hri_score']:.0f}/100 ({audit_res['hri_status']})",
+        style_sub
+    ))
+    story.append(HRFlowable(width="100%", thickness=2, color=c_teal, spaceBefore=2, spaceAfter=8))
 
-    # Summary Table
+    # 2. Framed Author & Provenance Card (Restored!)
+    prov_html = (
+        "<b>Lead Systems Architect:</b> Rohit Kumar, PMP, CEng (India), CEA, FSEr (TÜV)<br/>"
+        "<b>Professional Domain:</b> Mission-Critical Infrastructure &amp; Systems Engineering Specialist | "
+        "Forensic Project Controls &amp; Contract Governance<br/>"
+        "<b>Contact &amp; Channels:</b> grohit41@gmail.com | LinkedIn: linkedin.com/in/rohitg41 | "
+        "GitHub: github.com/ROHITG41/semiconductor-fab-arbiter<br/>"
+        "<b>Architecture Standard:</b> Hybrid Deterministic CPU Multiphysics + Cognitive Multi-Agent Consensus "
+        "(Python 3.12 / Pydantic v2 / Google Gemini / ReportLab)"
+    )
+    prov_table = Table([[Paragraph(prov_html, style_prov)]], colWidths=[540])
+    prov_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), c_light),
+        ('BOX', (0, 0), (-1, -1), 0.75, c_border),
+        ('LINEBEFORE', (0, 0), (0, -1), 3.5, c_navy),
+        ('TOPPADDING', (0, 0), (-1, -1), 7),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+    ]))
+    story.append(prov_table)
+    story.append(Spacer(1, 10))
+
+    # 3. Deterministic Telemetry & Attribution Table (Wrapped in Paragraphs so nothing clips!)
+    story.append(Paragraph("Deterministic Sub-Fab Utility &amp; Concurrency Audit Summary", style_h2))
     table_data = [
-        ["Audit Parameter", "Contractual Baseline", "Revised ECN Telemetry", "Deterministic Variance / Status"],
-        ["Acid Scrubber Exhaust", "1,400 CFM", f"{1400 + audit_res['cfm_delta']:,.0f} CFM", f"{audit_res['cfm_delta']:+,.0f} CFM ({'EXCEEDS HEADROOM' if audit_res['exhaust_headroom_violation'] else 'COMPLIANT'})"],
-        ["Process Cooling Water", "45 GPM", f"{45 + audit_res['gpm_delta']:,.1f} GPM", f"{audit_res['gpm_delta']:+,.1f} GPM ({'HEADROOM BREACH' if audit_res['pcw_headroom_violation'] else 'COMPLIANT'})"],
-        ["Electrical Power Load", "180 kW", f"{180 + audit_res['kw_delta']:,.1f} kW", f"{audit_res['kw_delta']:+,.1f} kW (SEMI F47 Ride-Through Verified)"],
-        ["Forensic Attribution", "Baseline DBR", "Assigned Liability", f"Primary Culprit: {audit_res['primary_culprit']}"],
+        [
+            Paragraph("Audit Parameter", style_th),
+            Paragraph("Contractual Baseline", style_th),
+            Paragraph("Revised ECN Telemetry", style_th),
+            Paragraph("Deterministic Variance &amp; Compliance Ruling", style_th)
+        ],
+        [
+            Paragraph("Acid Scrubber Exhaust", style_td_bold),
+            Paragraph(f"{audit_res.get('baseline_cfm', 1400):,.0f} CFM", style_td),
+            Paragraph(f"{audit_res.get('revised_cfm', 1400 + audit_res['cfm_delta']):,.0f} CFM", style_td),
+            Paragraph(
+                f"{audit_res['cfm_delta']:+,.0f} CFM "
+                f"({'<b>EXCEEDS HEADROOM</b>' if audit_res['exhaust_headroom_violation'] else '<b>COMPLIANT</b>'})",
+                style_td
+            )
+        ],
+        [
+            Paragraph("Process Cooling Water (PCW)", style_td_bold),
+            Paragraph(f"{audit_res.get('baseline_gpm', 45):,.1f} GPM", style_td),
+            Paragraph(f"{audit_res.get('revised_gpm', 45 + audit_res['gpm_delta']):,.1f} GPM", style_td),
+            Paragraph(
+                f"{audit_res['gpm_delta']:+,.1f} GPM | Pipe Vel: {audit_res['pipe_velocity_fps']:.2f} ft/s "
+                f"({'<b>HEADROOM BREACH</b>' if audit_res['pcw_headroom_violation'] else '<b>COMPLIANT</b>'})",
+                style_td
+            )
+        ],
+        [
+            Paragraph("Electrical Power &amp; Safety", style_td_bold),
+            Paragraph(f"{audit_res.get('baseline_kw', 180):,.1f} kW", style_td),
+            Paragraph(f"{audit_res.get('revised_kw', 180 + audit_res['kw_delta']):,.1f} kW", style_td),
+            Paragraph(
+                f"{audit_res['kw_delta']:+,.1f} kW | SEMI F47 &amp; VC-E Gate: "
+                f"<b>{'PASSED' if audit_res['safety_gate_passed'] else 'HOLD / FAILED'}</b>",
+                style_td
+            )
+        ],
+        [
+            Paragraph("Schedule Concurrency Offset", style_td_bold),
+            Paragraph("SCL / FIDIC Cl. 8.4", style_td),
+            Paragraph(f"Concurrent: {audit_res['concurrent_delay']} days", style_td),
+            Paragraph(
+                f"Net Culpable Lag — Tool-Install: <b>{audit_res['net_tool_install_lag']}d</b> | "
+                f"Base-Build MEP: <b>{audit_res['net_base_build_lag']}d</b>",
+                style_td
+            )
+        ],
+        [
+            Paragraph("Forensic Liability Isolation", style_td_bold),
+            Paragraph("Design Basis Report", style_td),
+            Paragraph("Assigned Culpability", style_td),
+            Paragraph(f"<b>{audit_res['primary_culprit']}</b>", style_td)
+        ],
     ]
-    t = Table(table_data, colWidths=[140, 110, 110, 180])
+    t = Table(table_data, colWidths=[125, 95, 105, 215])
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), c_navy),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,0), 9),
-        ('BACKGROUND', (0,1), (-1,-1), c_light),
-        ('TEXTCOLOR', (0,1), (-1,-1), c_slate),
-        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
-        ('FONTSIZE', (0,1), (-1,-1), 8.5),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BACKGROUND', (0, 0), (-1, 0), c_navy),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, c_light]),
+        ('GRID', (0, 0), (-1, -1), 0.5, c_border),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
     ]))
     story.append(t)
-    story.append(Spacer(1, 14))
+    story.append(Spacer(1, 10))
 
-    # Adjudication Memo Content
-    story.append(Paragraph("Executive Multi-Agent Arbitration & Engineering Adjudication Memorandum", styles['Heading2']))
-    story.append(HRFlowable(width="100%", thickness=1, color=c_navy, spaceBefore=4, spaceAfter=8))
+    # 4. Multi-Agent Arbitration Memorandum (Cleanly Parsed)
+    story.append(Paragraph("Executive Multi-Agent Arbitration &amp; Engineering Adjudication Memorandum", style_h2))
+    story.append(HRFlowable(width="100%", thickness=1, color=c_navy, spaceBefore=2, spaceAfter=6))
     
-    for line in memo_text.split('\n'):
-        if line.strip():
-            story.append(Paragraph(line, styles['Normal']))
-            story.append(Spacer(1, 4))
+    for raw_line in memo_text.split('\n'):
+        line = raw_line.strip()
+        if not line or line == '---':
+            continue
+        if line.startswith('### ') or line.startswith('## ') or line.startswith('# '):
+            clean_heading = re.sub(r'^#+\s*', '', line)
+            clean_heading = _sanitize_markdown_for_reportlab(clean_heading)
+            story.append(Paragraph(clean_heading, style_h3))
+        elif line.startswith('- ') or line.startswith('* '):
+            clean_bullet = _sanitize_markdown_for_reportlab(line[2:])
+            story.append(Paragraph(f"&bull; {clean_bullet}", style_bullet))
+        else:
+            clean_body = _sanitize_markdown_for_reportlab(line)
+            story.append(Paragraph(clean_body, style_body))
+
+    story.append(Spacer(1, 12))
+    story.append(HRFlowable(width="100%", thickness=0.75, color=c_border, spaceBefore=4, spaceAfter=4))
+    story.append(Paragraph(
+        "Copyright &copy; 2026 Rohit Kumar, PMP, CEng (India), CEA, FSEr (TÜV). All Rights Reserved. "
+        "Generated via Autonomous Semiconductor Change Intelligence &amp; Hook-Up Arbiter.",
+        style_footer
+    ))
 
     doc_pdf.build(story)
     buffer.seek(0)
@@ -267,21 +448,24 @@ def load_fab_wide_register():
     ])
 
 def build_deterministic_arbiter_memo(res: Dict[str, Any]) -> str:
-    """Deterministic arbitration memo fallback when API key is omitted."""
     return f"""### 1. Executive Summary & Tool Hook-Up Disposition
 - **Tool ID & Bay:** {res['tool_id']} ({res['process_bay']})
 - **Hook-Up Readiness Index (HRI):** {res['hri_score']:.0f}/100 — **{res['hri_status']}**
 - **Primary Liability Assignment:** {res['primary_culprit']}
 
 ### 2. Coupled Sub-Fab Physics & Spec-Delta Audit
-- **Scrubber Exhaust Impact:** Baseline 1,400 CFM vs. Revised {1400 + res['cfm_delta']:,.0f} CFM ({res['cfm_delta']:+,.0f} CFM delta). Header Exhaust Headroom Violation: **{str(res['exhaust_headroom_violation']).upper()}**.
-- **Process Cooling Water Impact:** Baseline 45 GPM vs. Revised {45 + res['gpm_delta']:,.1f} GPM ({res['gpm_delta']:+,.1f} GPM delta). PCW Headroom Violation: **{str(res['pcw_headroom_violation']).upper()}**.
+- **Scrubber Exhaust Impact:** Baseline {res.get('baseline_cfm', 1400):,.0f} CFM vs. Revised {res.get('revised_cfm', 1720):,.0f} CFM ({res['cfm_delta']:+,.0f} CFM delta). Header Exhaust Headroom Violation: **{str(res['exhaust_headroom_violation']).upper()}**.
+- **Process Cooling Water Impact:** Baseline {res.get('baseline_gpm', 45):,.1f} GPM vs. Revised {res.get('revised_gpm', 56):,.1f} GPM ({res['gpm_delta']:+,.1f} GPM delta). PCW Headroom Violation: **{str(res['pcw_headroom_violation']).upper()}**.
 - **Micro-Vibration & Power Safety:** SEMI F47 Voltage-Sag Compliance: **VERIFIED** | VC-E Vibration Limit: **{'BREACHED' if res['vibration_violation'] else 'COMPLIANT'}**.
 
 ### 3. Forensic Schedule Concurrency & EoT Determination
 - **Concurrent Delay Offset:** {res['concurrent_delay']} days co-caused by Base-Build MEP and Tool-Install.
 - **Net Culpable Lag:** Tool-Install Net Critical Lag = {res['net_tool_install_lag']} days | Base-Build Net Critical Lag = {res['net_base_build_lag']} days.
 - **Commercial Ruling:** Under FIDIC Sub-Clause 8.4 and SCL Delay Protocol standards, delay claims are adjusted to remove concurrent overlap. Inflated prolongation costs are discharged.
+
+### 4. Binding Remediation & Gas-Turn-On (GTO) Clearance Directives
+- **Directive 01 (Sub-Fab Balancing):** Verify point-of-connection (POC) damper & VFD setpoints prior to cleanroom lateral tie-in.
+- **Directive 02 (QA/QC Sign-Off):** Complete helium leak certification and SEMI S2 EMO interlock loop verification before authorizing final Gas-Turn-On (GTO).
 """
 
 # ---------------------------------------------------------------------
@@ -309,7 +493,11 @@ def main():
 
     with st.sidebar:
         st.subheader("🔑 Engine Configuration")
-        api_key_from_secrets = st.secrets.get("GEMINI_API_KEY", "")
+        try:
+            api_key_from_secrets = st.secrets.get("GEMINI_API_KEY", "")
+        except Exception:
+            api_key_from_secrets = ""
+
         if api_key_from_secrets:
             os.environ["GEMINI_API_KEY"] = api_key_from_secrets
             st.success("Gemini API Key active via Vault.")
@@ -354,7 +542,6 @@ def main():
             "• FIDIC Cl. 8.4 / SCL: EoT Concurrency"
         )
 
-    # Execute Deterministic Audit Immediately
     audit_res = run_fab_tool_audit(
         tool_id=tool_id_in,
         process_bay=bay_in,
@@ -374,11 +561,9 @@ def main():
         semi_f47_compliant=f47_ok
     )
 
-    # Fab-Wide Command Center (Multi-Bay Register)
     st.subheader("1. Fab-Wide Multi-Bay Command Center (Plant Scale)")
     fab_df = load_fab_wide_register()
     
-    # Highlight active tool if modified in sidebar
     if tool_id_in not in fab_df["Tool ID"].values:
         new_row = {"Tool ID": tool_id_in, "Process Bay": bay_in, "OEM Vendor": "Custom OEM", "PCW (GPM)": rev_gpm, "Exhaust (CFM)": rev_cfm, "Power (kW)": rev_kw, "HRI": audit_res["hri_score"], "Status": audit_res["hri_status"], "Primary Culprit": audit_res["primary_culprit"]}
         fab_df = pd.concat([pd.DataFrame([new_row]), fab_df], ignore_index=True)
@@ -390,7 +575,6 @@ def main():
     st.dataframe(fab_df, use_container_width=True, hide_index=True)
     st.markdown("<br/>", unsafe_allow_html=True)
 
-    # Top 4 Executive KPI Cards
     k1, k2, k3, k4 = st.columns(4)
     with k1:
         st.markdown(f"""
@@ -431,7 +615,6 @@ def main():
 
     st.markdown("<br/>", unsafe_allow_html=True)
 
-    # Two-Column Drill-Down Layout
     col_left, col_right = st.columns([1, 1.35])
 
     with col_left:
@@ -453,7 +636,7 @@ def main():
         if audit_res['hri_score'] >= 85.0:
             st.success("✅ TOOL HOOK-UP CLEARED: Ready for Waffle-Slab Rigging and Gas-Turn-On (GTO).")
         else:
-            st.error("❌ HOOK-UP READYNESS HOLD: Utility deficit or late OEM spec change requires remediation.")
+            st.error("❌ HOOK-UP READINESS HOLD: Utility deficit or late OEM spec change requires remediation.")
             if audit_res['exhaust_headroom_violation']:
                 st.warning("⚠️ Scrubber exhaust headroom exceeded. Header upsizing or VFD boost required before welding.")
             if audit_res['pcw_headroom_violation']:
@@ -474,9 +657,10 @@ def main():
                          "You are the Lead Semiconductor Capital Program & Commissioning Arbiter. "
                          "Analyze the provided deterministic telemetry, sub-fab header headroom, micro-vibration checks, "
                          "and schedule concurrency attribution for process tool hook-up. "
+                         "STRICT FORMATTING RULE: Never use LaTeX math ($...$) or backticks. Write all numbers and equations in plain alphanumeric text. "
                          "Draft an authoritative Multi-Agent Arbitration Memorandum covering: "
-                         "1. Tool Hook-Up Status & HRI Evaluation, 2. Coupled Sub-Fab Physics & OEM ECN-09 Impact, "
-                         "3. Forensic Liability Attribution (Base-Build vs. Tool-Install vs. OEM), "
+                         "1. Executive Summary & Tool Hook-Up Disposition, 2. Coupled Sub-Fab Physics & Spec-Delta Audit, "
+                         "3. Forensic Schedule Concurrency & EoT Determination, "
                          "4. Binding Remediation & Gas-Turn-On (GTO) Clearance Directives."),
                         ("human", "TOOL AUDIT DATA:\n{metrics}")
                     ])
@@ -494,7 +678,6 @@ def main():
         st.markdown(f'<div class="arbiter-card">{memo_text}</div>', unsafe_allow_html=True)
         st.markdown("<br/>", unsafe_allow_html=True)
 
-        # Generate ReportLab PDF Bytes
         pdf_bytes = generate_pdf_dossier(audit_res, memo_text)
         st.download_button(
             label="📥 Download ReportLab Pre-Hookup & NCR Dossier (.pdf)",
@@ -511,20 +694,24 @@ if __name__ == "__main__":
 st.divider()
 st.markdown(
     """
-    <div style="text-align: center; color: #475569; font-size: 0.85rem; padding: 10px 0;">
-        <p style="margin-bottom: 4px;">
-            <strong>Architect:</strong> Rohit Kumar, PMP, CEng (India), CEA, FSEr (TÜV) | 
+    <div style="text-align: center; color: #475569; font-size: 0.85rem; padding: 15px 0; line-height: 1.6;">
+        <p style="margin-bottom: 6px;">
+            <strong>Technology Stack:</strong> Python 3.12, Streamlit Community Cloud, Pydantic v2, LangChain, Google Gemini (gemini-3.8-flash), ReportLab PDF Engine
+        </p>
+        <p style="margin-bottom: 6px;">
+            <strong>Author &amp; Architect:</strong> Rohit Kumar, PMP, CEng (India), CEA, FSEr (TÜV)<br>
             Mission-Critical Infrastructure &amp; Systems Engineering Specialist | Forensic Project Controls &amp; Contract Governance
         </p>
-        <p style="margin-bottom: 4px;">
+        <p style="margin-bottom: 6px;">
             <strong>Enterprise Advisory &amp; Custom Architecture:</strong> 
-            Available for technical consulting &amp; custom agentic workflows &bull; 
+            Available for technical consulting, custom agentic workflow development &amp; private enterprise deployments.<br>
             <a href="https://www.linkedin.com/in/rohitg41" target="_blank" style="color: #2563EB; text-decoration: none;">LinkedIn</a> | 
             <a href="mailto:grohit41@gmail.com" style="color: #2563EB; text-decoration: none;">grohit41@gmail.com</a>
         </p>
-        <p style="font-size: 0.78rem; color: #64748B; margin-top: 6px;">
-            <em>Dataset Note: Independent engineering demonstration validated on representative, anonymized datasets.</em><br>
-            Copyright &copy; 2026 Rohit Kumar. All Rights Reserved.
+        <p style="font-size: 0.78rem; color: #64748B; margin-top: 8px;">
+            <em>Dataset Note: Independent engineering demonstration validated on representative, anonymized project datasets.</em><br>
+            <strong>Intellectual Property &amp; Licensing:</strong> Copyright &copy; 2026 Rohit Kumar. All Rights Reserved.<br>
+            Published solely for technical portfolio evaluation and architectural demonstration. Unauthorized copying or commercial deployment prohibited.
         </p>
     </div>
     """,
