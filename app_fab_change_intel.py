@@ -28,10 +28,10 @@ from pydantic import BaseModel, Field
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 
-# ReportLab PDF Imports
+# ReportLab PDF Imports (Includes KeepInFrame for strict 1-page enforcement)
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, KeepTogether
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, KeepTogether, KeepInFrame
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
@@ -204,15 +204,20 @@ def run_fab_tool_audit(
     }
 
 # ---------------------------------------------------------------------
-# 4. REPORTLAB PDF DOSSIER GENERATOR (NO ORPHANS & NO BLANK PAGES)
+# 4. REPORTLAB PDF DOSSIER GENERATOR (STRICT 1-PAGE KeepInFrame)
 # ---------------------------------------------------------------------
 def _sanitize_markdown_for_reportlab(text: str) -> str:
-    """Strips LaTeX math ($...$), backticks, and converts **bold** to ReportLab XML <b>bold</b>."""
+    """Strips LaTeX ($...$), replaces Unicode dashes, and converts **bold** to <b>bold</b>."""
+    # Strip any $...$ math blocks and any stray $ characters
     text = re.sub(r'\$([^\$]+)\$', r'\1', text)
-    text = text.replace('`', '')
+    text = text.replace('$', '').replace('`', '')
+    # Replace em-dash and en-dash with clean ASCII pipe/hyphen so Helvetica never drops them
+    text = text.replace('—', ' | ').replace('–', '-').replace('\u2014', ' | ').replace('\u2013', '-')
     text = re.sub(r'&(?!amp;|lt;|gt;|bull;|copy;|nbsp;)', '&amp;', text)
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
     text = text.replace('*', '')
+    # Add spaces around '=' if tight (e.g., Lag=4 -> Lag = 4)
+    text = re.sub(r'([A-Za-z])=(\d)', r'\1 = \2', text)
     return text.strip()
 
 def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
@@ -222,8 +227,8 @@ def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
         pagesize=letter,
         rightMargin=36,
         leftMargin=36,
-        topMargin=28,
-        bottomMargin=28
+        topMargin=22,
+        bottomMargin=22
     )
     styles = getSampleStyleSheet()
     
@@ -233,71 +238,70 @@ def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
     c_light = colors.HexColor("#F8FAFC")
     c_border = colors.HexColor("#CBD5E1")
 
-    # Custom Executive Paragraph Styles (keepWithNext=True prevents orphaned titles!)
     style_kicker = ParagraphStyle(
         'Kicker', parent=styles['Normal'],
-        fontName='Helvetica-Bold', fontSize=8.5, leading=11,
-        textColor=c_teal, spaceAfter=2, keepWithNext=True
+        fontName='Helvetica-Bold', fontSize=8.0, leading=10,
+        textColor=c_teal, spaceAfter=1, keepWithNext=True
     )
     style_title = ParagraphStyle(
         'ExecTitle', parent=styles['Title'],
-        fontName='Helvetica-Bold', fontSize=14.5, leading=18,
-        textColor=c_navy, alignment=0, spaceAfter=3, keepWithNext=True
+        fontName='Helvetica-Bold', fontSize=13.5, leading=16.5,
+        textColor=c_navy, alignment=0, spaceAfter=2, keepWithNext=True
     )
     style_sub = ParagraphStyle(
         'ExecSub', parent=styles['Normal'],
-        fontName='Helvetica-Bold', fontSize=9.5, leading=12.5,
-        textColor=c_slate, spaceAfter=4, keepWithNext=True
+        fontName='Helvetica-Bold', fontSize=9.0, leading=11.5,
+        textColor=c_slate, spaceAfter=3, keepWithNext=True
     )
     style_prov = ParagraphStyle(
         'Provenance', parent=styles['Normal'],
-        fontName='Helvetica', fontSize=8.0, leading=11.0,
+        fontName='Helvetica', fontSize=7.6, leading=10.2,
         textColor=c_slate
     )
     style_h2 = ParagraphStyle(
         'SectionH2', parent=styles['Heading2'],
-        fontName='Helvetica-Bold', fontSize=10.5, leading=13.5,
-        textColor=c_navy, spaceBefore=8, spaceAfter=3, keepWithNext=True
+        fontName='Helvetica-Bold', fontSize=10.0, leading=12.5,
+        textColor=c_navy, spaceBefore=6, spaceAfter=2, keepWithNext=True
     )
     style_h3 = ParagraphStyle(
         'SectionH3', parent=styles['Heading3'],
-        fontName='Helvetica-Bold', fontSize=9.5, leading=12.5,
-        textColor=c_teal, spaceBefore=6, spaceAfter=2, keepWithNext=True
+        fontName='Helvetica-Bold', fontSize=8.8, leading=11.2,
+        textColor=c_teal, spaceBefore=4.5, spaceAfter=1.5, keepWithNext=True
     )
     style_body = ParagraphStyle(
         'ExecBody', parent=styles['Normal'],
-        fontName='Helvetica', fontSize=8.8, leading=12.2,
-        textColor=c_slate, spaceAfter=2.5
+        fontName='Helvetica', fontSize=8.3, leading=11.0,
+        textColor=c_slate, spaceAfter=1.8
     )
     style_bullet = ParagraphStyle(
         'ExecBullet', parent=styles['Normal'],
-        fontName='Helvetica', fontSize=8.8, leading=12.2,
-        textColor=c_slate, leftIndent=12, spaceAfter=2.5
+        fontName='Helvetica', fontSize=8.3, leading=11.0,
+        textColor=c_slate, leftIndent=10, spaceAfter=1.8
     )
     style_th = ParagraphStyle(
         'TableHead', parent=styles['Normal'],
-        fontName='Helvetica-Bold', fontSize=8.2, leading=10.5,
+        fontName='Helvetica-Bold', fontSize=8.0, leading=10.0,
         textColor=colors.white
     )
     style_td = ParagraphStyle(
         'TableCell', parent=styles['Normal'],
-        fontName='Helvetica', fontSize=8.0, leading=10.5,
+        fontName='Helvetica', fontSize=7.9, leading=10.0,
         textColor=c_slate
     )
     style_td_bold = ParagraphStyle(
         'TableCellBold', parent=styles['Normal'],
-        fontName='Helvetica-Bold', fontSize=8.0, leading=10.5,
+        fontName='Helvetica-Bold', fontSize=7.9, leading=10.0,
         textColor=c_navy
     )
     style_footer = ParagraphStyle(
         'ExecFooter', parent=styles['Normal'],
-        fontName='Helvetica-Oblique', fontSize=7.5, leading=10,
+        fontName='Helvetica-Oblique', fontSize=7.2, leading=9.5,
         textColor=colors.HexColor("#64748B"), alignment=1
     )
 
-    story: List[Any] = []
+    inner_flowables: List[Any] = []
 
-    # 1. Masthead & Provenance Card grouped in KeepTogether so header never splits
+    # 1. Masthead & Provenance Card
     prov_html = (
         "<b>Lead Systems Architect:</b> Rohit Kumar, PMP, CEng (India), CEA, FSEr (TÜV)<br/>"
         "<b>Professional Domain:</b> Mission-Critical Infrastructure &amp; Systems Engineering Specialist | "
@@ -305,33 +309,31 @@ def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
         "<b>Contact &amp; Channels:</b> grohit41@gmail.com | LinkedIn: linkedin.com/in/rohitg41 | "
         "GitHub: github.com/ROHITG41/semiconductor-fab-arbiter<br/>"
         "<b>Architecture Standard:</b> Hybrid Deterministic CPU Multiphysics + Cognitive Multi-Agent Consensus "
-        "(Python 3.12 / Pydantic v2 / Google Gemini / ReportLab)"
+        "(Python 3.12 / Pydantic v2 / Gemini / ReportLab)"
     )
     prov_table = Table([[Paragraph(prov_html, style_prov)]], colWidths=[540])
     prov_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), c_light),
         ('BOX', (0, 0), (-1, -1), 0.75, c_border),
         ('LINEBEFORE', (0, 0), (0, -1), 3.5, c_navy),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 4.5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4.5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
     ]))
 
-    story.append(KeepTogether([
-        Paragraph("AUTONOMOUS SEMICONDUCTOR CHANGE INTELLIGENCE &amp; HOOK-UP ARBITER", style_kicker),
-        Paragraph(f"Pre-Hookup Readiness &amp; Forensic Adjudication Dossier: {audit_res['tool_id']}", style_title),
-        Paragraph(
-            f"Process Zone: {audit_res['process_bay']} &nbsp;|&nbsp; "
-            f"Hook-Up Readiness Index (HRI): {audit_res['hri_score']:.0f}/100 ({audit_res['hri_status']})",
-            style_sub
-        ),
-        HRFlowable(width="100%", thickness=2, color=c_teal, spaceBefore=2, spaceAfter=6),
-        prov_table,
-        Spacer(1, 8)
-    ]))
+    inner_flowables.append(Paragraph("AUTONOMOUS SEMICONDUCTOR CHANGE INTELLIGENCE &amp; HOOK-UP ARBITER", style_kicker))
+    inner_flowables.append(Paragraph(f"Pre-Hookup Readiness &amp; Forensic Adjudication Dossier: {audit_res['tool_id']}", style_title))
+    inner_flowables.append(Paragraph(
+        f"Process Zone: {audit_res['process_bay']} &nbsp;|&nbsp; "
+        f"Hook-Up Readiness Index (HRI): {audit_res['hri_score']:.0f}/100 ({audit_res['hri_status']})",
+        style_sub
+    ))
+    inner_flowables.append(HRFlowable(width="100%", thickness=1.8, color=c_teal, spaceBefore=1, spaceAfter=4))
+    inner_flowables.append(prov_table)
+    inner_flowables.append(Spacer(1, 5))
 
-    # 2. Deterministic Telemetry & Attribution Table (Kept together with its title)
+    # 2. Deterministic Telemetry & Attribution Table (Wider Col 1 & Col 2 so PCW and 45.0 GPM never split)
     table_data = [
         [
             Paragraph("Audit Parameter", style_th),
@@ -374,8 +376,8 @@ def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
             Paragraph("SCL / FIDIC Cl. 8.4", style_td),
             Paragraph(f"Concurrent: {audit_res['concurrent_delay']} days", style_td),
             Paragraph(
-                f"Net Culpable Lag — Tool-Install: <b>{audit_res['net_tool_install_lag']}d</b> | "
-                f"Base-Build MEP: <b>{audit_res['net_base_build_lag']}d</b>",
+                f"Net Lag: Tool-Install = <b>{audit_res['net_tool_install_lag']}d</b> | "
+                f"Base-Build MEP = <b>{audit_res['net_base_build_lag']}d</b>",
                 style_td
             )
         ],
@@ -386,32 +388,27 @@ def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
             Paragraph(f"<b>{audit_res['primary_culprit']}</b>", style_td)
         ],
     ]
-    t = Table(table_data, colWidths=[125, 95, 105, 215], repeatRows=1)
+    t = Table(table_data, colWidths=[142, 98, 102, 198], repeatRows=1)
     t.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), c_navy),
         ('BACKGROUND', (0, 1), (-1, -1), colors.white),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, c_light]),
         ('GRID', (0, 0), (-1, -1), 0.5, c_border),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('TOPPADDING', (0, 0), (-1, -1), 4.5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4.5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 6),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 3.5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3.5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
     ]))
 
-    story.append(KeepTogether([
-        Paragraph("Deterministic Sub-Fab Utility &amp; Concurrency Audit Summary", style_h2),
-        t,
-        Spacer(1, 8)
-    ]))
+    inner_flowables.append(Paragraph("Deterministic Sub-Fab Utility &amp; Concurrency Audit Summary", style_h2))
+    inner_flowables.append(t)
+    inner_flowables.append(Spacer(1, 5))
 
-    # 3. Multi-Agent Arbitration Memorandum (Orphan-Protected Subsections)
-    memo_header_flowables: List[Any] = [
-        Paragraph("Executive Multi-Agent Arbitration &amp; Engineering Adjudication Memorandum", style_h2),
-        HRFlowable(width="100%", thickness=1, color=c_navy, spaceBefore=2, spaceAfter=4)
-    ]
+    # 3. Multi-Agent Arbitration Memorandum
+    inner_flowables.append(Paragraph("Executive Multi-Agent Arbitration &amp; Engineering Adjudication Memorandum", style_h2))
+    inner_flowables.append(HRFlowable(width="100%", thickness=1, color=c_navy, spaceBefore=1, spaceAfter=3))
 
-    pending_flowables: List[Any] = memo_header_flowables
     for raw_line in memo_text.split('\n'):
         line = raw_line.strip()
         if not line or line == '---':
@@ -419,49 +416,32 @@ def generate_pdf_dossier(audit_res: Dict[str, Any], memo_text: str) -> bytes:
         if line.startswith('### ') or line.startswith('## ') or line.startswith('# '):
             clean_heading = re.sub(r'^#+\s*', '', line)
             clean_heading = _sanitize_markdown_for_reportlab(clean_heading)
-            pending_flowables.append(Paragraph(clean_heading, style_h3))
+            inner_flowables.append(Paragraph(clean_heading, style_h3))
         elif line.startswith('- ') or line.startswith('* '):
             clean_bullet = _sanitize_markdown_for_reportlab(line[2:])
-            p_item = Paragraph(f"&bull; {clean_bullet}", style_bullet)
-            if pending_flowables:
-                pending_flowables.append(p_item)
-                story.append(KeepTogether(pending_flowables))
-                pending_flowables = []
-            else:
-                story.append(p_item)
+            inner_flowables.append(Paragraph(f"&bull; {clean_bullet}", style_bullet))
         else:
             clean_body = _sanitize_markdown_for_reportlab(line)
-            p_item = Paragraph(clean_body, style_body)
-            if pending_flowables:
-                pending_flowables.append(p_item)
-                story.append(KeepTogether(pending_flowables))
-                pending_flowables = []
-            else:
-                story.append(p_item)
+            inner_flowables.append(Paragraph(clean_body, style_body))
 
-    if pending_flowables:
-        story.append(KeepTogether(pending_flowables))
+    # 4. Compact Footer inside the same 1-page frame
+    inner_flowables.append(Spacer(1, 5))
+    inner_flowables.append(HRFlowable(width="100%", thickness=0.75, color=c_border, spaceBefore=1, spaceAfter=2))
+    inner_flowables.append(Paragraph(
+        "Copyright &copy; 2026 Rohit Kumar, PMP, CEng (India), CEA, FSEr (TÜV). All Rights Reserved. "
+        "Generated via Autonomous Semiconductor Change Intelligence &amp; Hook-Up Arbiter.",
+        style_footer
+    ))
 
-    # 4. Anti-Blank-Page Guard: Strip any trailing Spacers before appending the compact footer
-    while story and isinstance(story[-1], Spacer):
-        story.pop()
+    # STRICT 1-PAGE ENFORCEMENT: KeepInFrame automatically scales content to fit 1 Letter page (540x748 pt)
+    single_page_frame = KeepInFrame(
+        maxWidth=540,
+        maxHeight=748,
+        content=inner_flowables,
+        mode='shrink'
+    )
 
-    footer_block = KeepTogether([
-        Spacer(1, 6),
-        HRFlowable(width="100%", thickness=0.75, color=c_border, spaceBefore=2, spaceAfter=3),
-        Paragraph(
-            "Copyright &copy; 2026 Rohit Kumar, PMP, CEng (India), CEA, FSEr (TÜV). All Rights Reserved. "
-            "Generated via Autonomous Semiconductor Change Intelligence &amp; Hook-Up Arbiter.",
-            style_footer
-        )
-    ])
-    if len(story) > 1:
-        last_flowable = story.pop()
-        story.append(KeepTogether([last_flowable, footer_block]))
-    else:
-        story.append(footer_block)
-
-    doc_pdf.build(story)
+    doc_pdf.build([single_page_frame])
     buffer.seek(0)
     return buffer.getvalue()
 
@@ -480,12 +460,12 @@ def load_fab_wide_register():
 def build_deterministic_arbiter_memo(res: Dict[str, Any]) -> str:
     return f"""### 1. Executive Summary & Tool Hook-Up Disposition
 - **Tool ID & Bay:** {res['tool_id']} ({res['process_bay']})
-- **Hook-Up Readiness Index (HRI):** {res['hri_score']:.0f}/100 — **{res['hri_status']}**
+- **Hook-Up Readiness Index (HRI):** {res['hri_score']:.0f}/100 | Status: **{res['hri_status']}**
 - **Primary Liability Assignment:** {res['primary_culprit']}
 
 ### 2. Coupled Sub-Fab Physics & Spec-Delta Audit
-- **Scrubber Exhaust Impact:** Baseline {res.get('baseline_cfm', 1400):,.0f} CFM vs. Revised {res.get('revised_cfm', 1720):,.0f} CFM ({res['cfm_delta']:+,.0f} CFM delta). Header Exhaust Headroom Violation: **{str(res['exhaust_headroom_violation']).upper()}**.
-- **Process Cooling Water Impact:** Baseline {res.get('baseline_gpm', 45):,.1f} GPM vs. Revised {res.get('revised_gpm', 56):,.1f} GPM ({res['gpm_delta']:+,.1f} GPM delta). PCW Headroom Violation: **{str(res['pcw_headroom_violation']).upper()}**.
+- **Scrubber Exhaust Impact:** Baseline {res.get('baseline_cfm', 1400):,.0f} CFM vs. Revised {res.get('revised_cfm', 1720):,.0f} CFM ({res['cfm_delta']:+,.0f} CFM delta) | Header Exhaust Violation: **{str(res['exhaust_headroom_violation']).upper()}**.
+- **Process Cooling Water Impact:** Baseline {res.get('baseline_gpm', 45):,.1f} GPM vs. Revised {res.get('revised_gpm', 56):,.1f} GPM ({res['gpm_delta']:+,.1f} GPM delta) | PCW Headroom Violation: **{str(res['pcw_headroom_violation']).upper()}**.
 - **Micro-Vibration & Power Safety:** SEMI F47 Voltage-Sag Compliance: **VERIFIED** | VC-E Vibration Limit: **{'BREACHED' if res['vibration_violation'] else 'COMPLIANT'}**.
 
 ### 3. Forensic Schedule Concurrency & EoT Determination
@@ -687,7 +667,8 @@ def main():
                          "You are the Lead Semiconductor Capital Program & Commissioning Arbiter. "
                          "Analyze the provided deterministic telemetry, sub-fab header headroom, micro-vibration checks, "
                          "and schedule concurrency attribution for process tool hook-up. "
-                         "STRICT FORMATTING RULE: Never use LaTeX math ($...$) or backticks. Write all numbers and equations in plain alphanumeric text. "
+                         "STRICT FORMATTING RULE: Never use LaTeX math ($...$), em-dashes, or backticks. Write all numbers and equations in plain ASCII text. "
+                         "Keep the memorandum concise (maximum 10 bullet points across 4 sections). "
                          "Draft an authoritative Multi-Agent Arbitration Memorandum covering: "
                          "1. Executive Summary & Tool Hook-Up Disposition, 2. Coupled Sub-Fab Physics & Spec-Delta Audit, "
                          "3. Forensic Schedule Concurrency & EoT Determination, "
